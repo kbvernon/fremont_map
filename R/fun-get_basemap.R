@@ -43,7 +43,7 @@ get_basemap <- function(x,
   query <- list(
     bbox    = paste(x, collapse = ","),
     bboxSR  = st_crs(x)$epsg,
-    imageSR = 3857,
+    imageSR = 4326,
     f       = "image",
     format  = "png",
     size    = paste(size, collapse = ","),
