@@ -1,10 +1,10 @@
 # Fremont Map
 
-Code and data for creating a regional overview map showing the range of archaeological sites associated with prehistoric maize farmers known collectively as the Fremont (Madsen and Simms 1998). The map is adapted from Janetski _et al_ (2011). There is a slight difference in that this map includes more of the area west of the Great Salt Lake. This may be wrong, but state records from the Utah State Historic Preservation Office do show that there are Fremont sites there.
+Code and data for creating a regional overview map showing the range of archaeological sites associated with prehistoric maize farmers known collectively as the Fremont (Madsen and Simms 1998). The map is adapted from Janetski _et al_ (2011). There is a slight difference in that this map includes more of the area west of the Great Salt Lake. This may be wrong, but state records from the Utah State Historic Preservation Office suggest otherwise.
 
 <br>
 
-![](fremont_map.png)
+![](fremont_map.jpg)
 
 <br>
 

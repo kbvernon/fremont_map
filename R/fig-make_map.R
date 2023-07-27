@@ -12,43 +12,40 @@
 # 7) Save
 ####################.
 
+# preamble ----------------------------------------------------------------
 
-
-# R Preamble --------------------------------------------------------------
-
-library(cowplot)
+library(ggfx)
 library(here)
 library(sf)
 library(tidyverse)
 library(tigris)
 
-here("R", "fun-get_basemap.R") %>% source()
+sys.source(
+  here("R", "fun-get_basemap.R"),
+  envir = attach(NULL, name = "basemap")
+)
 
+# shapefiles --------------------------------------------------------------
 
-
-# Shapefiles --------------------------------------------------------------
-
-fremont <- here("gis", "fremont.shp") %>% read_sf()
+fremont <- here("gis", "fremont.shp") |> read_sf()
 
 state_names <- c(
   "Idaho", "Wyoming", "Colorado", "New Mexico", "Arizona", "Nevada", "Utah"
 )
 
-states <- tigris::states() %>% 
-  rename_with(tolower) %>% 
-  filter(name %in% state_names) %>% 
-  select(name, stusps) %>%
-  st_transform(4326)
+states <- tigris::states() |> 
+  rename_with(tolower) |> 
+  filter(name %in% state_names) |> 
+  select(name, stusps) |>
+  st_transform(26912)
 
-utah <- states %>% filter(name == "Utah")
+utah <- states |> filter(name == "Utah")
 
+# project area ------------------------------------------------------------
 
-
-# Project Area ------------------------------------------------------------
-
-bb8 <- states %>% 
-  filter(name == "Utah") %>% 
-  st_buffer(50000) %>% 
+bb8 <- states |> 
+  filter(name == "Utah") |> 
+  st_buffer(50000) |> 
   st_bbox()
 
 dy <- bb8[["ymax"]] - bb8[["ymin"]]
@@ -58,9 +55,7 @@ ratio <- c(9000 * dx/dy, 9000)
 
 cover <- st_sym_difference(utah, st_as_sfc(bb8))
 
-
-
-# Basemap -----------------------------------------------------------------
+# basemap -----------------------------------------------------------------
 
 basemap <- get_basemap(
   bb8,
@@ -68,22 +63,19 @@ basemap <- get_basemap(
   size = ratio
 )
 
+# main map ----------------------------------------------------------------
 
-
-# Main Map ----------------------------------------------------------------
-
-bob <-
-  ggplot() +
+bob <- ggplot() +
   annotation_raster(
-    basemap, 
-    bb8[["xmin"]], bb8[["xmax"]], 
+    basemap,
+    bb8[["xmin"]], bb8[["xmax"]],
     bb8[["ymin"]], bb8[["ymax"]]
   ) +
   geom_sf(
     data = states, 
     fill = "transparent", 
     color = "black",
-    size = 0.2
+    linewidth = 0.2
   ) +
   geom_sf(
     data = cover, 
@@ -95,93 +87,94 @@ bob <-
     data = utah, 
     fill = "transparent", 
     color = "black",
-    size = 0.2
+    linewidth = 0.3
   ) +
   geom_sf(
     data = st_as_sfc(bb8), 
     fill = "transparent", 
-    color = "black"
+    color = "black",
+    linewidth = 0.3
+  ) +
+  with_blur(
+    geom_sf(
+      data = fremont,
+      fill = "transparent",
+      color = alpha("white", 0.7),
+      linewidth = 2
+    ),
+    sigma = 3
+  ) +
+  with_blur(
+    geom_sf(
+      data = fremont,
+      fill = "transparent",
+      color = alpha("#10A8A0", 0.7),
+      linewidth = 1.5
+    ),
+    sigma = 3
   ) +
   geom_sf(
     data = fremont,
-    fill = alpha("gray45", 0.2),
-    color = "darkred",
-    linetype = "dashed",
-    size = 0.35
+    fill = "transparent",
+    color = "#19535F",
+    linewidth = 0.5
+  )
+  
+# inset map ---------------------------------------------------------------
+
+wst_cntr <- states |> st_union() |> st_centroid()
+
+flerp <- states
+
+st_geometry(flerp) <- (st_geometry(states)-wst_cntr) * 0.09 + wst_cntr + c(37000, 290000)
+
+st_crs(flerp) <- 26912
+
+state_labels <- flerp |> 
+  st_centroid() |> 
+  st_coordinates() |> 
+  as_tibble() |> 
+  rename_with(tolower) |> 
+  mutate(
+    state = states$stusps,
+    color = if_else(state == "UT", "white", "black"),
+    y     = if_else(state == "ID", y - 6500, y)
+  )
+
+full_map <- bob +
+  geom_sf(
+    data = flerp,
+    fill = "gray98",
+    color = "gray45",
+    linewidth = 0.1
+  ) +
+  geom_sf(
+    data = flerp |> filter(name == "Utah"),
+    fill = "gray10",
+    color = "black"
+  ) +
+  geom_text(
+    data = state_labels,
+    aes(x, y, label = state), 
+    color = state_labels$color,
+    size = 12/.pt
   ) +
   coord_sf(
+    crs = 26912,
     xlim = c(bb8[["xmin"]], bb8[["xmax"]]),
     ylim = c(bb8[["ymin"]], bb8[["ymax"]]),
     expand = FALSE
   ) +
   theme_void()
 
-
-
-# Inset Map ---------------------------------------------------------------
-
-state_labels <- 
-  states %>% 
-  st_centroid() %>% 
-  st_coordinates() %>% 
-  as_tibble() %>% 
-  rename_with(tolower) %>% 
-  mutate(
-    state = states$stusps,
-    color = if_else(state == "UT", "white", "black"),
-    y     = if_else(state == "ID", y - 0.75, y)
-  )
-
-inset <-
-  ggplot() +
-  geom_sf(
-    data = states,
-    fill = "gray98",
-    color = "gray45",
-    size = 0.1
-  ) +
-  geom_sf(
-    data = utah,
-    fill = "gray10",
-    color = "black"
-  ) +
-  geom_text(
-    data = state_labels,
-    aes(x, y, label = state, color = color),
-    size = 2 # have to make this smaller because of cowplot/ggsave scaling
-  ) +
-  scale_color_manual(
-    values = c("black","white"),
-    guide = "none"
-  ) +
-  coord_sf(
-    expand = FALSE
-  ) +
-  theme_void()
-
-full_map <-
-  ggdraw() +
-  draw_plot(bob) +
-  draw_plot(
-    inset,
-    x = 0.83,
-    y = 0.98,
-    hjust = 1,
-    vjust = 1,
-    height = 0.27,
-    width = 0.27
-  )
-
-# full_map
-
-
+full_map
 
 # Save --------------------------------------------------------------------
 
 ggsave(
   plot = full_map,
-  filename = here("fremont_map.png"),
-  width = 4,
-  height = 4 * dy/dx,
-  dpi = 300
+  filename = here("fremont_map.jpg"),
+  width = 5.75,
+  height = 5.75 * dy/dx,
+  dpi = 900
 )
